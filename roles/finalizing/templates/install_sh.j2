@@ -1,0 +1,74 @@
+#!/bin/bash
+
+#setting up the variables
+HOSTNAME={{ hostname }}
+DOMAIN={{ domain }}
+TZAREA={{ tzarea }}
+TZNAME={{ tzname }}
+LANGUAGES={{ languages }}
+DEFAULT_LOCALE={{ default_locale }}
+KERNEL={{ kernel }}
+
+apt update
+apt -y full-upgrade
+
+#setting up debconf and tzdata
+debconf-set-selections <<EOF
+locales locales/default_environment_locale select ${DEFAULT_LOCALE}
+debconf debconf/priority select critical
+debconf debconf/frontend select Noninteractive
+tzdata tzdata/Areas select ${TZAREA}
+tzdata tzdata/Zones/${TZAREA} select ${TZNAME}
+EOF
+
+#installing the languages
+apt -y install $(for language in ${LANGUAGES} ; do echo language-pack-${language} ; done)
+echo "${TZAREA}/${TZNAME}" > /etc/timezone
+ln -sf /usr/share/zoneinfo/${TZNAME} /etc/localtime
+update-locale ${DEFAULT_LOCALE}
+
+#installing the kernel
+apt -y install --no-install-recommends ${KERNEL}
+
+#insalling the common packages
+apt -y install dosfstools
+
+#installing efi for making the system bootable
+mkdosfs -F32 -n UEFI-SDA /dev/sda1
+mkdir /boot/efi
+echo "PARTUUID=$(blkid -s PARTUUID -o value /dev/disk/by-partlabel/UEFI) /boot/efi vfat defaults 0 1" >> /etc/fstab
+mount /boot/efi
+apt -y install grub-efi initramfs-tools lvm2
+
+sleep 2
+echo "Installing grub"
+echo "-------------------------------"
+update-initramfs -c -k all
+update-grub
+grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=ubuntu --recheck --no-floppy
+sleep 2
+
+#creating swap for system
+mkswap /dev/{{vgname}}/swap
+echo "/dev/{{vgname}}/swap none swap d efaults 0 0" >> /etc/fstab
+
+#creating fstab file
+{% for partition in partitions %}
+{% if partition.target is defined %}
+echo "/dev/mapper/{{vgname}}-{{partition.name}}  {{ partition.target }}  {{ fstype }}    {{ partition.opts }}    0   {{ partition.pass }}" >> /etc/fstab 
+{% endif %}
+{% endfor %}
+
+#adding extra packages
+apt -y install ssh unattended-upgrades snapd vim rsync
+
+#adding new user {{ username }}
+useradd -m -s /bin/bash {{ username }}
+
+mkdir /home/{{ username }}/.ssh
+chown -R {{ username }}:{{ username }} /home/{{ username }}/.ssh
+chmod -R 0700 /home/{{ username }}/.ssh
+echo {{ sshpublickey }} >> /home/{{ username }}/.ssh/authorized_keys
+chown -R {{ username }}:{{ username }} /home/{{ username }}/.ssh/authorized_keys
+chmod 400 /home/{{ username }}/.ssh/authorized_keys
+echo "{{ username }} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers

@@ -1,0 +1,15 @@
+---
+- name: Include vars file
+  include_vars:
+    file: "{{ inventory_hostname }}.yaml"
+
+- name: Installing debootstrap package
+  become: yes
+  apt:
+    name: debootstrap
+    state: present
+    update_cache: true
+  
+- name: Install ubuntu system with debootstrap
+  become: yes
+  command: "debootstrap {{osrelease}} /target"

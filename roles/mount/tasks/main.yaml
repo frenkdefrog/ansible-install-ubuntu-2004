@@ -1,0 +1,32 @@
+---
+- name: Include vars file
+  include_vars:
+    file: "{{ inventory_hostname }}.yaml"
+
+- name: Creating temporary target directory
+  become: yes
+  file:
+    path: /target
+    state: directory
+  
+- name: Mount lv's to target directory
+  become: yes
+  mount:
+    path: '/target{{ item.target }}'
+    src: '/dev/mapper/{{vgname}}-{{item.name}}'
+    state: mounted
+    opts: '{{item.opts}}'
+    fstype: "{{ fstype }}"
+    passno: '{{item.pass}}'
+  when: item.target is defined
+  with_items: "{{ partitions }}"
+      
+- name: change permissions
+  become: yes
+  file:
+    path: '/target{{item.name}}'
+    state: directory
+    mode: 1777
+  with_items:
+    - {name: '/tmp'}
+    - {name: '/var/tmp'}

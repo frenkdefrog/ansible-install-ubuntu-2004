@@ -1,0 +1,52 @@
+- name: Include vars file
+  include_vars:
+    file: "{{ inventory_hostname }}.yaml"
+
+- name: Mounting the neccessary directories for chrooting the new system
+  become: yes
+  
+  mount:
+    path: /target/{{item}}
+    src: /{{item}}
+    opts: bind
+    state: mounted
+    fstype: none
+  with_items:
+    - 'proc'
+    - 'dev'
+    - 'sys'
+
+- name: Copy install script
+  become: yes
+  vars:
+    sshpublickey: "{{ lookup('file', sshkey) }}"
+  template:
+    src: install_sh.j2
+    dest: /target/install.sh
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Running finalizer script in chroot env
+  become: yes
+  command: "chroot /target /bin/bash -- install.sh"
+
+- name: Remove install script
+  become: yes
+  file:
+    path: /target/install.sh
+    state: absent
+
+- name: Umounting the mounted directories
+  become: yes
+  mount:
+    path: /{{item}}
+    opts: Rfl
+    state: unmounted
+    fstype: none
+  with_items:
+    - 'target/proc'
+    - 'target/dev'
+    - 'target/sys'
+    - 'target'
+

@@ -1,0 +1,92 @@
+---
+- name: Include vars file
+  include_vars:
+    file: "{{ inventory_hostname }}.yaml"
+
+- name: Install lvm2 dependency
+  become: yes
+  package: 
+    name: lvm2
+    state: present
+
+- name: Checking existing pv/vg on disk
+  become: yes
+  shell: 'pvs | grep {{ blockdevice }}'
+  register: pvexists
+  failed_when: pvexists.rc not in [0, 1]
+  
+  
+- debug:
+    msg: "The {{ vgname }} exists on target {{ blockdevice }}. Please, remove it manually, or set the 'force_vgdelete' variable to 'force' and rerun the playbook  "
+  when: pvexists.rc == 0 and force_vgdelete != 'force'
+  failed_when: pvexists.rc == 0 and force_vgdelete != 'force'
+
+- name: "Deleting existing lvs and vg"
+  become: yes
+  include: delete_lv_vg.yaml
+  when: pvexists.rc == 0 and force_vgdelete == 'force'
+
+- name: Read device information (always use unit when probing)
+  become: yes
+  parted: 
+    device: "{{ blockdevice }}"
+    unit: MiB
+  register: blockdevice_info
+
+- name: Remove all partitions from disk
+  become: yes
+  parted:
+    device: "{{ blockdevice }}"
+    number: '{{ item.num }}'
+    state: absent
+  loop: '{{ blockdevice_info.partitions }}'
+
+- name: Partitioning the disk {{ blockdevice }}
+  become: yes
+  parted:
+    device: "{{ blockdevice }}"
+    label: gpt
+    name: UEFI
+    number: 1
+    state: present
+    part_start: 0%
+    part_end: 540MiB
+    flags: [ esp ]
+    part_type: primary
+  
+- name: Partitioning the disk {{ blockdevice }} - lvm
+  become: yes
+  parted:
+    device: "{{ blockdevice }}"
+    label: gpt
+    name: lvm
+    number: 2
+    state: present
+    flags: [ lvm ]
+    part_start: 540MiB
+    part_end: 99%
+  
+
+  
+- name: Creating VG on LVM
+  become: yes
+  lvg:
+    vg: "{{vgname}}"
+    pvs: "{{ blockdevice }}2"
+  
+- name: Creating logical volumes
+  become: yes
+  lvol:
+    vg: "{{vgname}}"
+    lv: '{{ item.name}}'
+    size: '{{ item.size }}g'
+    force: yes
+  with_items: "{{ partitions }}"
+
+- name: Formating partitions
+  become: yes
+  filesystem:
+    fstype: "{{ fstype }}"
+    dev: '/dev/{{vgname}}/{{item.name}}'
+  when: item.target is defined
+  with_items: "{{ partitions }}"

@@ -1,0 +1,11 @@
+---
+- hosts: ubuntu_servers
+  tasks:
+  - include_vars: "{{ inventory_hostname }}.yaml"
+  roles:
+    - {role: live_install, tags: "live_install"}
+    - {role: partition_format, tags: "partition, format"}
+    - {role: mount, tags: "mount"}
+    - {role: install, tags: "debootstrap, install"}
+    - {role: setup, tags: "setup"}
+    - {role: finalizing, tags: "finalizing, chroot"}

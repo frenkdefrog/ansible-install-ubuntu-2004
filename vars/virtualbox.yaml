@@ -1,0 +1,26 @@
+hostname: almafa
+domain: ocsipc.lan
+osrelease: focal
+tzarea: Europe
+tzname: Budapest
+languages: "en hu"
+default_locale: C.UTF-8
+vgname: vgrendszer
+force_vgdelete: "force"
+kernel: linux-image-generic
+username: user
+sshkey: /home/lorinc/.ssh/ansible.pub
+fstype: ext4
+blockdevice: /dev/sda
+partitions:
+  - {name: 'root', target: '/', opts: 'noatime,errors=remount-ro', pass: '1', size: '2' }
+  - {name: 'boot', target: '/boot', opts: 'noatime,nodev,nosuid,noexec', pass: '2', size: '1' }
+  - {name: 'home', target: '/home', opts: 'noatime,nodev,nosuid,noexec', pass: '2', size: '2' }
+  - {name: 'tmp', target: '/tmp', opts: 'nodev,nosuid', pass: '2', size: '1' }
+  - {name: 'usr', target: '/usr', opts: 'noatime,nodev', pass: '2', size: '2' }
+  - {name: 'var', target: '/var', opts: 'noatime,nodev,nosuid', pass: '2', size: '2' }
+  - {name: 'cache', target: '/var/cache', opts: 'nodev,nosuid,noexec', pass: '2', size: '2' }
+  - {name: 'log', target: '/var/log', opts: 'noatime,nodev,nosuid,noexec', pass: '2', size: '1' }
+  - {name: 'spool', target: '/var/spool', opts: 'nodev,nosuid,noexec', pass: '2', size: '2' }
+  - {name: 'vartmp', target: '/var/tmp', opts: 'noatime,nodev,nosuid,noexec', pass: '2', size: '1' }
+  - {name: 'swap', size: '4'}

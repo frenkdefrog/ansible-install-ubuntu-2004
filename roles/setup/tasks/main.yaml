@@ -1,0 +1,54 @@
+- name: Include vars file
+  include_vars:
+    file: "{{ inventory_hostname }}.yaml"
+    
+- name: Set the hostname
+  become: yes
+  copy:
+    content: "{{ hostname }}"
+    dest: /target/etc/hostname
+  
+- name: Adding to hosts
+  become: yes
+  lineinfile:
+    path: /target/etc/hosts
+    insertafter: '^127.0.0.1'
+    line: '127.0.1.1       {{hostname}}.{{domain}} {{hostname}}'
+    state: present
+  
+- name: Get content of sources file
+  become: yes
+  slurp:
+    src: /etc/apt/sources.list
+  register: sourceslist
+  
+- name: Save contents to new file
+  become: yes
+  set_fact:
+    sourcefile_content: "{{ sourceslist.content | b64decode }}"
+  
+- name: Copying sources.list file to target directory
+  become: yes
+  lineinfile:
+    path: /target/etc/apt/sources.list
+    line: "{{ item }}"
+    create: yes
+  when: item | regex_search("^deb http(.*)$")
+  with_items: "{{ sourcefile_content.split('\n') }}"
+  
+- name: Searching for all yaml file in neetplan directory
+  become: yes
+  find: 
+    path: "/etc/netplan" 
+    file_type: file
+    patterns: "*.yaml"
+  register: files_to_copy
+  
+- name: Copying netplan file into chroot directory
+  become: yes
+  copy:
+    src: "{{ item.path }}"
+    dest: "/target/etc/netplan/"
+    remote_src: yes
+  with_items:
+    - "{{ files_to_copy.files }}"

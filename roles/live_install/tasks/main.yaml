@@ -1,0 +1,7 @@
+- name: Installing ssh
+  become: yes
+  apt: 
+    update_cache: yes
+    package: ssh
+    state: present
+    
